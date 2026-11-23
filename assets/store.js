@@ -50,7 +50,7 @@ export const store = {
     }
     const p = new fb.A.GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
     try { await fb.A.signInWithPopup(fb.auth, p); }
-    catch (e) { if (/popup/.test(e.code || '')) await fb.A.signInWithRedirect(fb.auth, p); else throw e; }
+    catch (e) { if (/popup-blocked|operation-not-supported/.test(e.code || '')) { sessionStorage.setItem('cp.next', sessionStorage.getItem('cp.next') || '#/dasbor'); await fb.A.signInWithRedirect(fb.auth, p); } else throw e; }
     await new Promise(r => { const off = store.onUser(u => { if (u) { off(); r(); } }); });
     return user;
   },

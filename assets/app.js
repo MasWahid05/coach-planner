@@ -89,11 +89,16 @@ function landing(anchor) {
       <span class="eyebrow">Untuk pelatih semua cabang olahraga</span>
       <h1>Periodisasi tahunan rapi dalam 5 menit.</h1>
       <p class="lead">Masukkan tanggal latihan dan lomba utama. Coach Planner menyusun fase, mesosiklus, minggu, dan gelombang volume–intensitas, lalu Anda tinggal menyesuaikan dan mengekspornya ke Excel.</p>
-      <div class="actions"><a class="btn btn-primary" href="${store.user ? '#/baru' : '#/masuk'}">Buat rencana gratis</a><a class="btn btn-ghost" href="#/#cara">Lihat cara kerjanya</a></div>
+      <div class="actions"><a class="btn btn-primary" href="${store.user ? '#/baru' : '#/masuk'}">Buat rencana gratis</a><a class="btn btn-ghost" href="#/#video">▶ Tonton video 2 menit</a></div>
       <ul class="ticks"><li>Tanpa kartu kredit</li><li>Ekspor Excel berwarna</li><li>Bisa dibuka di HP</li></ul>
     </div>
     <div class="shot" aria-label="Contoh tampilan rencana tahunan"><div class="bar"><i></i><i></i><i></i></div>
       ${miniSheet(sp)}${chartSVG(sp, { colW: 12, height: 190, dots: false }).svg}</div>
+  </div></section>
+
+  <section class="s" id="video" style="padding-top:24px"><div class="wrap" style="max-width:980px">
+    <div class="center"><span class="eyebrow">Video</span><h2>Lihat Coach Planner bekerja dalam 2 menit</h2></div>
+    <div class="video-box"><iframe src="https://www.youtube-nocookie.com/embed/mGQZw4_UiG4?rel=0" title="Video promo Coach Planner" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>
   </div></section>
 
   <section class="s alt" id="fitur"><div class="wrap">
@@ -180,6 +185,21 @@ function harga() {
 }
 
 // ---------- masuk ----------
+const IN_APP = /FBAN|FBAV|Instagram|Line\/|WhatsApp|TikTok|musical_ly|BytedanceWebview|; wv\)/i.test(navigator.userAgent);
+function authMsg(e) {
+  const c = (e && e.code) || '';
+  const M = {
+    'auth/popup-closed-by-user': 'Jendela login ditutup sebelum selesai. Coba lagi.',
+    'auth/cancelled-popup-request': 'Login dibatalkan. Coba lagi.',
+    'auth/network-request-failed': 'Koneksi internet bermasalah. Periksa sinyal lalu coba lagi.',
+    'auth/unauthorized-domain': 'Alamat web ini belum diizinkan untuk login. Buka lewat coach-planner-alpha.vercel.app.',
+    'auth/web-storage-unsupported': 'Browser memblokir penyimpanan login. Matikan mode penyamaran / izinkan cookie, atau pakai Chrome.',
+    'auth/operation-not-supported-in-this-environment': 'Browser ini tidak mendukung login Google. Buka di Chrome atau Safari.',
+    'auth/too-many-requests': 'Terlalu banyak percobaan. Tunggu sebentar lalu coba lagi.',
+  };
+  return M[c] || ('Gagal masuk: ' + (c || (e && e.message) || 'tidak diketahui'));
+}
+window.addEventListener('cp-auth-error', e => { if (e.detail?.code !== 'auth/popup-closed-by-user') toast(authMsg(e.detail)); });
 function masuk() {
   if (store.user) { location.hash = sessionStorage.getItem('cp.next') || '#/dasbor'; sessionStorage.removeItem('cp.next'); return; }
   app.innerHTML = `<section class="s"><div class="wrap" style="max-width:460px"><div class="card" style="padding:32px;text-align:center">
@@ -187,12 +207,14 @@ function masuk() {
     <h1 style="font-size:1.7rem">Masuk ke Coach Planner</h1>
     <p class="muted">${store.mode === 'cloud' ? 'Gunakan akun Google Anda. Rencana tersimpan aman dan bisa dibuka dari perangkat mana pun.' : 'Mode perangkat: rencana disimpan di browser ini.'}</p>
     <button class="btn btn-ghost" id="g" style="width:100%;min-height:50px">${store.mode === 'cloud' ? `<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.5-4.5 2.4-7.2 2.4-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg> Masuk dengan Google` : 'Mulai di perangkat ini'}</button>
+    ${IN_APP && store.mode === 'cloud' ? `<div class="card" style="margin-top:14px;padding:14px;text-align:left;background:#fff7e0;border-color:#f5d48a"><b>Buka di Chrome / Safari</b><p class="small" style="margin:6px 0 10px">Google tidak mengizinkan login dari browser bawaan WhatsApp/Instagram/TikTok. Ketuk ⋮ atau ··· lalu pilih <i>Buka di browser</i>, atau salin tautan ini.</p><button class="btn btn-ghost btn-sm" id="cp-copy">Salin tautan</button></div>` : ''}
     <p class="small muted" style="margin-top:16px">Dengan masuk, Anda menyetujui penggunaan data akun (nama & email) hanya untuk menyimpan rencana Anda.</p>
   </div></div></section>`;
+  const cpy = $('#cp-copy'); if (cpy) cpy.onclick = async () => { try { await navigator.clipboard.writeText(location.origin + '/#/masuk'); toast('Tautan disalin. Tempel di Chrome/Safari.'); } catch { prompt('Salin tautan ini:', location.origin + '/#/masuk'); } };
   $('#g').onclick = async () => {
     $('#g').disabled = true;
     try { await store.signIn(); const n = sessionStorage.getItem('cp.next') || '#/dasbor'; sessionStorage.removeItem('cp.next'); location.hash = n; }
-    catch (e) { console.error(e); toast('Gagal masuk: ' + (e.code || e.message)); $('#g').disabled = false; }
+    catch (e) { console.error(e); toast(authMsg(e)); $('#g').disabled = false; }
   };
 }
 function akun() {
@@ -201,7 +223,7 @@ function akun() {
     <div class="card"><p><b>${esc(u.name)}</b><br><span class="muted">${esc(u.email || 'Akun perangkat')}</span></p>
     <p>Paket: <span class="badge ${store.isPro ? 'pro' : ''}">${store.isPro ? 'PRO' : 'Gratis'}</span>${u.proUntil ? ` <span class="small muted">berlaku sampai ${E.fmtLong(new Date(u.proUntil))}</span>` : ''}</p>
     <p class="small muted">ID akun: <code>${esc(u.uid)}</code></p>
-    <div class="toolbar">${store.isPro ? '' : '<a class="btn btn-primary" href="#/harga">Upgrade ke Pro</a>'}<button class="btn btn-ghost" id="out">Keluar</button></div></div></div></div>`;
+    <div class="toolbar">${u.admin ? '<a class="btn btn-primary" href="#/admin">Buka Admin</a>' : ''}${store.isPro ? '' : '<a class="btn btn-primary" href="#/harga">Upgrade ke Pro</a>'}<button class="btn btn-ghost" id="out">Keluar</button></div></div></div></div>`;
   $('#out').onclick = async () => { await store.signOut(); location.hash = '#/'; };
 }
 
@@ -689,14 +711,18 @@ async function editor(id) {
 // ---------- admin ----------
 async function admin() {
   if (needLogin()) return;
-  if (!store.user.admin) { app.innerHTML = `<div class="page"><div class="wrap card empty"><h2>Khusus admin</h2><a class="btn btn-primary" href="#/dasbor">Kembali</a></div></div>`; return; }
+  if (!store.user.admin) {
+    app.innerHTML = `<div class="page"><div class="wrap card empty" style="max-width:520px"><h2>Khusus admin</h2><p class="muted">Anda sedang masuk sebagai <b>${esc(store.user.email || store.user.name)}</b>, yang bukan akun admin. Keluar lalu masuk lagi dengan akun Google admin.</p><div class="toolbar" style="justify-content:center"><button class="btn btn-primary" id="sw">Masuk dengan akun lain</button><a class="btn btn-ghost" href="#/dasbor">Kembali</a></div></div></div>`;
+    $('#sw').onclick = async () => { await store.signOut(); sessionStorage.setItem('cp.next', '#/admin'); location.hash = '#/masuk'; };
+    return;
+  }
   app.innerHTML = `<div class="page"><div class="wrap"><div class="page-head"><div><span class="eyebrow">Admin</span><h1>Pengguna & aktivasi Pro</h1></div><input class="in" id="q" placeholder="Cari email / ID" style="max-width:280px"></div><div class="card" style="overflow-x:auto" id="ul">Memuat…</div></div></div>`;
   let users = [];
   const draw = () => {
     const q = $('#q').value.toLowerCase();
-    $('#ul').innerHTML = `<table class="admin"><tr><th>Pengguna</th><th>Paket</th><th>Aksi</th></tr>${users.filter(u => !q || (u.email || '').toLowerCase().includes(q) || u.uid.toLowerCase().includes(q)).map(u => `<tr><td><b>${esc(u.name || '')}</b><br><span class="small muted">${esc(u.email || '')}<br><code>${esc(u.uid)}</code></span></td>
-      <td><span class="badge ${u.tier === 'pro' ? 'pro' : ''}">${u.tier === 'pro' ? 'PRO' : 'Gratis'}</span>${u.proUntil ? `<div class="small muted">s.d. ${E.fmtLong(new Date(u.proUntil))}</div>` : ''}</td>
-      <td><div class="toolbar"><button class="btn btn-ghost btn-sm" data-pro="${u.uid}" data-m="1">Pro 1 bln</button><button class="btn btn-ghost btn-sm" data-pro="${u.uid}" data-m="12">Pro 12 bln</button><button class="btn btn-danger btn-sm" data-pro="${u.uid}" data-m="0">Gratis</button></div></td></tr>`).join('')}</table>`;
+    $('#ul').innerHTML = `<p class="small muted" style="margin:0 0 8px">${users.length} pengguna · ${users.filter(x => x.tier === 'pro').length} Pro</p><table class="admin"><tr><th>Pengguna</th><th>Paket</th><th>Aksi</th></tr>${users.filter(u => !q || (u.email || '').toLowerCase().includes(q) || u.uid.toLowerCase().includes(q)).map(u => `<tr><td><b>${esc(u.name || '')}</b><br><span class="small muted">${esc(u.email || '')}<br><code>${esc(u.uid)}</code></span></td>
+      <td data-l="Paket"><span class="badge ${u.tier === 'pro' ? 'pro' : ''}">${u.tier === 'pro' ? 'PRO' : 'Gratis'}</span>${u.proUntil ? `<div class="small muted">s.d. ${E.fmtLong(new Date(u.proUntil))}</div>` : ''}</td>
+      <td data-l="Aksi"><div class="toolbar"><button class="btn btn-ghost btn-sm" data-pro="${u.uid}" data-m="1">Pro 1 bln</button><button class="btn btn-ghost btn-sm" data-pro="${u.uid}" data-m="12">Pro 12 bln</button><button class="btn btn-danger btn-sm" data-pro="${u.uid}" data-m="0">Gratis</button></div></td></tr>`).join('')}</table>`;
   };
   try { users = await store.adminUsers(); draw(); } catch (e) { $('#ul').textContent = 'Gagal memuat: ' + e.message; return; }
   $('#q').oninput = draw;
