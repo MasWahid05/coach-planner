@@ -4,6 +4,9 @@
     { "source": "/__/firebase/:path*", "destination": "https://coach-planner-8a3ec.firebaseapp.com/__/firebase/:path*" }
   ],
   "headers": [
+    { "source": "/(assets/.*|config.js|index.html|)", "headers": [
+      { "key": "Cache-Control", "value": "no-cache" }
+    ] },
     { "source": "/(.*)", "headers": [
       { "key": "X-Content-Type-Options", "value": "nosniff" },
       { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
