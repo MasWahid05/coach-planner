@@ -168,6 +168,7 @@ export function generate(input) {
   plan.tests = [0, ...phases.filter(p => ['PU', 'PK', 'PRA'].includes(p.key)).map(p => st[phases.indexOf(p)] + p.len - 1)];
   plan.tests = [...new Set(plan.tests)].filter(w => w < weeks);
   autoLoad(plan);
+  ensureExtras(plan);
   return plan;
 }
 
@@ -275,3 +276,33 @@ export function periodSpans(plan) {
   return out;
 }
 export const phaseColor = p => p.color || PHASES[p.key]?.color || '#94a3b8';
+
+// ---------- program bulanan / mingguan / harian ----------
+import { template } from './templates.js';
+export function ensureExtras(plan) {
+  const t = template(plan.sport, plan.cats);
+  plan.goals ||= t.goals;
+  plan.micro ||= t.micro;
+  plan.daily ||= t.daily;
+  plan.monthNotes ||= {};
+  return plan;
+}
+export const monthKey = m => `${m.name} ${m.year}`;
+// ringkasan per bulan (dihitung dari Annual)
+export function monthRows(plan) {
+  const pst = segStarts(plan.phases), mst = segStarts(plan.meso);
+  return monthSpans(plan).map((m, i) => {
+    const ws = Array.from({ length: m.len }, (_, k) => m.start + k);
+    const cnt = {}; ws.forEach(w => { const p = plan.phases[segAt(plan.phases, w)]; cnt[p.label] = (cnt[p.label] || 0) + 1; });
+    const phase = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0][0];
+    const meso = [...new Set(ws.map(w => plan.meso[segAt(plan.meso, w)].label))];
+    const avg = a => Math.round(ws.reduce((s, w) => s + a[w], 0) / ws.length);
+    return {
+      no: i + 1, key: monthKey(m), name: m.name, year: m.year, start: m.start, end: m.start + m.len - 1, len: m.len,
+      phase, meso, vol: avg(plan.vol), int: avg(plan.int), load: ws.reduce((s, w) => s + weekLoad(plan, w), 0),
+      tests: ws.filter(w => plan.tests.includes(w)).map(w => w + 1), camps: ws.filter(w => plan.camps.includes(w)).map(w => w + 1),
+      events: plan.events.filter(e => ws.includes(e.week)),
+      note: plan.monthNotes?.[monthKey(m)] || {},
+    };
+  });
+}

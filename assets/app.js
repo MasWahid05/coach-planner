@@ -2,6 +2,7 @@ import * as E from './engine.js';
 import { chartSVG, COLORS } from './chart.js';
 import { store } from './store.js';
 import { CONFIG } from '../config.js';
+import { DAYS, CNS } from './templates.js';
 
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
@@ -334,7 +335,7 @@ async function editor(id) {
   let plan;
   try { plan = await store.get(id); } catch (e) { console.error(e); }
   if (!plan) { app.innerHTML = `<div class="page"><div class="wrap empty card"><h2>Rencana tidak ditemukan</h2><a class="btn btn-primary" href="#/dasbor">Kembali ke dasbor</a></div></div>`; return; }
-  plan.id = id;
+  plan.id = id; E.ensureExtras(plan);
   const hist = []; let saveT, dirty = false;
   const snapshot = () => { hist.push(JSON.stringify(plan)); if (hist.length > 60) hist.shift(); $('#undo') && ($('#undo').disabled = false); };
   const persist = () => {
@@ -352,12 +353,16 @@ async function editor(id) {
         <button class="btn btn-ghost btn-sm" id="auto">Hitung ulang beban</button>
         <button class="btn btn-ghost btn-sm" id="print">Cetak / PDF</button>
         <button class="btn btn-primary btn-sm" id="xlsx">Ekspor Excel</button></div></div>
+    <div class="tabs no-print" role="tablist" aria-label="Bagian program">${[['annual', 'Tahunan'], ['bulanan', 'Bulanan'], ['mingguan', 'Mingguan'], ['harian', 'Harian']].map(([k, l], i) => `<button role="tab" data-view="${k}" aria-selected="${i === 0}">${l}</button>`).join('')}</div>
+    <div id="v-other" hidden></div>
+    <div id="v-annual">
     <div class="panel print-zoom"><div class="panel-head"><h2>Tabel periodisasi</h2><div class="legend">${E.PHASE_ORDER.map(k => `<span><i style="background:${E.PHASES[k].color}"></i>${E.PHASES[k].label}</span>`).join('')}</div></div>
       <p class="tip no-print" style="margin:10px 16px 0">Klik blok berwarna untuk mengubah nama/panjang, klik sel Tes/TC untuk menandai, klik baris Pertandingan untuk menambah atau menggeser lomba, ketik angka di baris volume/intensitas/frekuensi.</p>
       <div class="sheet-wrap" id="sw"></div></div>
     <div class="panel print-zoom"><div class="panel-head"><h2>Grafik volume & intensitas</h2>
       <div class="chart-tools"><span class="tip">Seret titik untuk mengubah:</span><div class="seg-toggle" role="group" aria-label="Seri yang diubah"><button data-series="vol" aria-pressed="true">Volume</button><button data-series="int" aria-pressed="false">Intensitas</button></div></div></div>
       <div class="chart-box" id="cb"></div></div>
+    </div>
     <div class="print-only print-wm" id="pwm"></div>
   </div></div>`;
 
@@ -423,7 +428,84 @@ async function editor(id) {
   };
   let chartGeom;
   const renderChart = () => { const c = chartSVG(plan, { colW: 34, height: 280 }); chartGeom = c; $('#cb').innerHTML = c.svg; };
-  const renderAll = () => { renderHead(); renderSheet(); renderChart(); };
+  let view = 'annual', selWeek = Math.max(0, Math.min(plan.weeks - 1, Math.floor((Date.now() - E.parseDate(plan.start)) / (7 * 864e5))));
+  const renderAll = () => { renderHead(); renderSheet(); renderChart(); if (view !== 'annual') renderOther(); };
+
+  // --- tab Bulanan / Mingguan / Harian (semua terhubung ke data Tahunan) ---
+  const vo = $('#v-other');
+  const phaseOf = w => plan.phases[E.segAt(plan.phases, w)];
+  const mesoOf = w => plan.meso[E.segAt(plan.meso, w)];
+  const weekOpts = sel => Array.from({ length: plan.weeks }, (_, w) => `<option value="${w}" ${w === sel ? 'selected' : ''}>Minggu ${w + 1} · ${E.fmtShort(E.weekDate(plan, w))} · ${esc(phaseOf(w).label)}</option>`).join('');
+  const dayOpts = sel => DAYS.map(d => `<option ${d === sel ? 'selected' : ''}>${d}</option>`).join('');
+  const cnsBadge = c => `<span class="cns cns-${(c || '').toLowerCase()}">${esc(c)}</span>`;
+  const linkNote = t => `<p class="tip" style="margin:0 0 12px">🔗 ${t}</p>`;
+  function renderOther() {
+    if (view === 'bulanan') {
+      const rows = E.monthRows(plan), G = plan.goals;
+      vo.innerHTML = `<div class="panel"><div class="panel-head"><h2>Tujuan latihan tahunan</h2><span class="tip">Satu butir per baris. Dipakai di Excel semua sheet.</span></div>
+        <div class="goals">${[['fisik', 'Persiapan fisik'], ['teknik', 'Persiapan teknik'], ['taktik', 'Persiapan taktik'], ['mental', 'Persiapan mental']].map(([k, l]) => `<label class="f"><span>${l}</span><textarea class="in" rows="6" data-p="goals.${k}" data-kind="lines">${esc(G[k].join('\n'))}</textarea></label>`).join('')}</div></div>
+        <div class="panel"><div class="panel-head"><h2>Program bulanan (mesosiklus)</h2></div><div style="padding:12px 16px 0">${linkNote('Minggu, fase, mesosiklus, volume, intensitas, beban, tes, dan lomba diambil otomatis dari tab Tahunan. Kolom fokus diisi pelatih.')}</div>
+        <div class="sheet-wrap"><table class="prog"><thead><tr><th>No</th><th>Bulan</th><th>Minggu</th><th>Fase</th><th>Vol</th><th>Int</th><th>Beban</th><th style="min-width:180px">Sub-fase / fokus utama</th><th style="min-width:220px">Fokus fisik & biomotor</th><th style="min-width:220px">Fokus teknik & taktik</th><th style="min-width:200px">Tes, lomba & agenda</th></tr></thead><tbody>
+        ${rows.map(m => { const p = `monthNotes.${m.key}`; return `<tr><td>${m.no}</td><td><b>${m.name}</b><br><small>${m.year}</small></td><td>W${m.start + 1}–W${m.end + 1}<br><small>${m.meso.join(', ')}</small></td>
+          <td><span class="ph" style="background:${E.phaseColor(plan.phases[E.segAt(plan.phases, m.start)])}">${esc(m.phase)}</span></td><td class="n">${m.vol}%</td><td class="n">${m.int}%</td><td class="n">${m.load}</td>
+          <td><textarea class="in" rows="2" data-p="${p}.focus">${esc(m.note.focus || '')}</textarea></td><td><textarea class="in" rows="3" data-p="${p}.fisik">${esc(m.note.fisik || '')}</textarea></td><td><textarea class="in" rows="3" data-p="${p}.teknik">${esc(m.note.teknik || '')}</textarea></td>
+          <td><small>${[m.tests.length ? 'Tes: W' + m.tests.join(', W') : '', m.camps.length ? 'TC: W' + m.camps.join(', W') : '', ...m.events.map(e => (e.main ? '★ ' : '● ') + e.name)].filter(Boolean).map(esc).join('<br>') || '—'}</small><textarea class="in" rows="2" placeholder="Agenda lain" data-p="${p}.agenda">${esc(m.note.agenda || '')}</textarea></td></tr>`; }).join('')}
+        </tbody></table></div></div>`;
+    } else if (view === 'mingguan') {
+      const w = selWeek;
+      vo.innerHTML = `<div class="panel"><div class="panel-head"><h2>Mikrosiklus standar (Senin–Minggu)</h2><label class="tip" style="display:flex;gap:8px;align-items:center">Pratinjau <select class="in" id="selw" style="min-height:36px;width:auto">${weekOpts(w)}</select></label></div>
+        <div style="padding:12px 16px 0">${linkNote(`Intensitas hari = intensitas minggu dari tab Tahunan × intensitas relatif. Minggu ${w + 1}: intensitas ${plan.int[w]}%, volume ${plan.vol[w]}%, fase ${esc(phaseOf(w).label)}.`)}</div>
+        <div class="sheet-wrap"><table class="prog"><thead><tr><th>Hari</th><th>Beban CNS</th><th style="min-width:260px">Fokus sesi</th><th style="min-width:200px">Komponen biomotor</th><th>Intensitas relatif</th><th>Target minggu ${w + 1}</th></tr></thead><tbody>
+        ${plan.micro.map((d, i) => `<tr><td><b>${d.day}</b></td><td><select class="in" data-p="micro.${i}.cns" data-rerender>${CNS.map(c => `<option ${c === d.cns ? 'selected' : ''}>${c}</option>`).join('')}</select></td>
+          <td><input class="in" data-p="micro.${i}.fokus" value="${esc(d.fokus)}"></td><td><input class="in" data-p="micro.${i}.komponen" value="${esc(d.komponen)}"></td>
+          <td><input class="in n" type="number" min="0" max="120" data-p="micro.${i}.rel" data-kind="pct" value="${Math.round(d.rel * 100)}" style="width:90px"> %</td><td class="n" data-dayt="${i}"><b>${d.cns === 'REST' ? 'Istirahat' : Math.round(plan.int[w] * d.rel) + '%'}</b></td></tr>`).join('')}
+        </tbody></table></div></div>
+        <div class="panel"><div class="panel-head"><h2>Program mingguan (${plan.weeks} minggu)</h2><span class="tip">Diambil dari tab Tahunan — ubah di sana.</span></div><div class="sheet-wrap" style="max-height:60vh"><table class="prog"><thead><tr><th>Minggu</th><th>Tanggal</th><th>Fase</th><th>Meso</th><th>Vol</th><th>Int</th><th>Puncak</th><th>Sesi</th><th>Beban</th><th>Tes/TC</th><th>Lomba</th></tr></thead><tbody>
+        ${Array.from({ length: plan.weeks }, (_, k) => `<tr class="${k === w ? 'sel' : ''}"><td class="n"><b>${k + 1}</b></td><td>${E.fmtShort(E.weekDate(plan, k))}</td><td><span class="ph" style="background:${E.phaseColor(phaseOf(k))}">${esc(phaseOf(k).label)}</span></td><td>${esc(mesoOf(k).label)}</td><td class="n">${plan.vol[k]}%</td><td class="n">${plan.int[k]}%</td><td class="n">${E.peakIdx(plan, k)}</td><td class="n">${E.sum(plan.freq[k])}</td><td class="n">${E.weekLoad(plan, k)}</td><td>${[plan.tests.includes(k) ? 'Tes' : '', plan.camps.includes(k) ? 'TC' : ''].filter(Boolean).join(', ')}</td><td>${plan.events.filter(e => e.week === k).map(e => (e.main ? '★ ' : '') + esc(e.name)).join(' / ')}</td></tr>`).join('')}
+        </tbody></table></div></div>`;
+    } else if (view === 'harian') {
+      const w = selWeek, dm = Object.fromEntries(plan.micro.map(d => [d.day, d]));
+      vo.innerHTML = `<div class="panel"><div class="panel-head"><h2>Program harian</h2><label class="tip" style="display:flex;gap:8px;align-items:center">Untuk <select class="in" id="selw" style="min-height:36px;width:auto">${weekOpts(w)}</select></label></div>
+        <div style="padding:12px 16px">${linkNote(`Minggu ${w + 1} (${E.fmtLong(E.weekDate(plan, w))}) · ${esc(phaseOf(w).label)} · ${esc(mesoOf(w).label)} · volume ${plan.vol[w]}% · intensitas ${plan.int[w]}% — dari tab Tahunan. Target harian dari mikrosiklus (tab Mingguan).`)}
+        <button class="btn btn-ghost btn-sm" id="adds">+ Tambah sesi</button></div></div>
+        ${plan.daily.map((s, si) => { const d = dm[s.day]; const tgt = d ? (d.cns === 'REST' ? 'Istirahat' : Math.round(plan.int[w] * d.rel) + '%') : '—'; return `<div class="panel"><div class="panel-head" style="gap:8px">
+          <input class="in" style="flex:1;min-width:200px;font-weight:700" data-p="daily.${si}.title" value="${esc(s.title)}" aria-label="Judul sesi">
+          <select class="in" style="width:auto" data-p="daily.${si}.day" data-rerender aria-label="Hari">${dayOpts(s.day)}</select>
+          <span class="tip">${d ? cnsBadge(d.cns) : ''} target intensitas <b>${tgt}</b></span>
+          <button class="btn btn-danger btn-sm" data-dels="${si}">Hapus sesi</button></div>
+          <div class="sheet-wrap"><table class="prog"><thead><tr><th>No</th><th style="min-width:150px">Fase sesi</th><th style="min-width:220px">Latihan / drill</th><th style="min-width:110px">Dosis</th><th>Int. %</th><th style="min-width:90px">Istirahat</th><th style="min-width:200px">Petunjuk / coaching cue</th><th></th></tr></thead><tbody>
+          ${s.items.map((it, ii) => `<tr><td class="n">${ii + 1}</td>${['fase', 'latihan', 'dosis'].map(k => `<td><input class="in" data-p="daily.${si}.items.${ii}.${k}" value="${esc(it[k])}"></td>`).join('')}
+            <td><input class="in n" type="number" min="0" max="110" data-p="daily.${si}.items.${ii}.int" data-kind="num" value="${it.int}" style="width:72px"></td>
+            ${['rest', 'cue'].map(k => `<td><input class="in" data-p="daily.${si}.items.${ii}.${k}" value="${esc(it[k])}"></td>`).join('')}
+            <td><button class="btn btn-ghost btn-icon" data-deli="${si}.${ii}" aria-label="Hapus baris">×</button></td></tr>`).join('')}
+          </tbody></table></div><div style="padding:10px 16px"><button class="btn btn-ghost btn-sm" data-addi="${si}">+ Tambah baris</button></div></div>`; }).join('')}`;
+    }
+  }
+  const setPath = (obj, path, val) => { const ks = path.split('.'); let o = obj; for (let i = 0; i < ks.length - 1; i++) o = (o[ks[i]] ??= {}); o[ks[ks.length - 1]] = val; };
+  let otherSnap = false;
+  vo.addEventListener('focusin', () => { otherSnap = false; });
+  vo.addEventListener('input', e => {
+    const t = e.target, p = t.dataset.p; if (!p) return;
+    if (!otherSnap) { snapshot(); otherSnap = true; }
+    let v = t.value; const k = t.dataset.kind;
+    if (k === 'lines') v = v.split('\n').map(s => s.trim()).filter(Boolean);
+    else if (k === 'pct') v = E.clamp(+v || 0, 0, 150) / 100;
+    else if (k === 'num') v = E.clamp(+v || 0, 0, 120);
+    setPath(plan, p, v); persist();
+    if (k === 'pct') { const i = +p.split('.')[1]; const d = plan.micro[i]; const c = vo.querySelector(`[data-dayt="${i}"]`); if (c) c.innerHTML = `<b>${d.cns === 'REST' ? 'Istirahat' : Math.round(plan.int[selWeek] * d.rel) + '%'}</b>`; }
+  });
+  vo.addEventListener('change', e => { if (e.target.id === 'selw') { selWeek = +e.target.value; renderOther(); } else if (e.target.hasAttribute('data-rerender')) renderOther(); });
+  vo.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.id === 'adds') change(() => plan.daily.push({ title: `Sesi ${plan.daily.length + 1}`, day: 'Senin', items: [{ fase: 'Pemanasan', latihan: '', dosis: '', int: 60, rest: '', cue: '' }] }));
+    else if (b.dataset.addi) change(() => plan.daily[+b.dataset.addi].items.push({ fase: '', latihan: '', dosis: '', int: 80, rest: '', cue: '' }));
+    else if (b.dataset.deli) { const [s, i] = b.dataset.deli.split('.').map(Number); change(() => plan.daily[s].items.splice(i, 1)); }
+    else if (b.dataset.dels) { const s = +b.dataset.dels; confirmBox('Hapus sesi?', `“${plan.daily[s].title}” akan dihapus (bisa diurungkan).`, 'Hapus', true).then(ok => ok && change(() => plan.daily.splice(s, 1))); }
+  });
+  $$('[data-view]').forEach(b => b.onclick = () => {
+    view = b.dataset.view; $$('[data-view]').forEach(x => x.setAttribute('aria-selected', x === b));
+    $('#v-annual').hidden = view !== 'annual'; vo.hidden = view === 'annual'; if (view !== 'annual') renderOther();
+  });
   renderAll();
 
   // --- interaksi tabel ---

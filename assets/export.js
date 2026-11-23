@@ -1,6 +1,7 @@
 // Ekspor .xlsx berwarna (ExcelJS dari CDN, dimuat saat dibutuhkan).
 import { PHASES, PERIOD_COLORS, segStarts, monthSpans, periodSpans, weekDate, phaseColor, peakIdx, fmtLong } from './engine.js';
 import { chartPNG } from './chart.js';
+import { linkedSheets } from './linked.js';
 
 const EXCELJS = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
 let loading;
@@ -58,22 +59,31 @@ export async function exportXlsx(plan, { watermark }) {
     put(r, half, half + 5, c, { h: 'left', bold: true, fill: '#f1f5f9' }); put(r, half + 6, last, d || '', { h: 'left' });
     ws.getRow(r).height = 18; r++;
   });
-  r++;
+  // Tujuan latihan (persiapan fisik/teknik/taktik/mental)
+  const G = plan.goals || {}; const q = Math.floor(W / 4);
+  put(r, 1, 2, 'TUJUAN LATIHAN', { h: 'left', bold: true, color: '#ffffff', fill: '#334155' });
+  [['fisik', 'PERSIAPAN FISIK'], ['teknik', 'PERSIAPAN TEKNIK'], ['taktik', 'PERSIAPAN TAKTIK'], ['mental', 'PERSIAPAN MENTAL']].forEach(([k, l], i) => {
+    const c1 = C0 + i * q, c2 = i === 3 ? last : C0 + (i + 1) * q - 1;
+    put(r, c1, c2, l, { bold: true, fill: '#e6f4f2' });
+    put(r + 1, c1, c2, (G[k] || []).map((x, j) => `${j + 1}. ${x}`).join(String.fromCharCode(10)), { h: 'left' });
+  });
+  ws.getRow(r + 1).height = Math.max(30, 13 * Math.max(...['fisik', 'teknik', 'taktik', 'mental'].map(k => (G[k] || []).length), 1));
+  r += 3;
 
   // ---- Kalender ----
   const top = r;
   label(r, 'Bulan'); monthSpans(plan).forEach((m, i) => put(r, C0 + m.start, C0 + m.start + m.len - 1, m.len > 1 ? m.name : m.name.slice(0, 3), { bold: true, fill: i % 2 ? '#dbeafe' : '#bfdbfe' })); r++;
   label(r, 'Tanggal (Senin)'); for (let w = 0; w < W; w++) put(r, C0 + w, C0 + w, weekDate(plan, w).getUTCDate()); r++;
   label(r, 'Minggu ke'); for (let w = 0; w < W; w++) put(r, C0 + w, C0 + w, w + 1, { bold: true, fill: '#ffff00' }); r++;
-  const freezeRow = r - 1;
+  const freezeRow = r - 1; const R = { wno: freezeRow };
   r++;
 
   // ---- Periode, fase, meso ----
   label(r, 'Periode latihan'); { let s = 0; periodSpans(plan).forEach(p => { put(r, C0 + s, C0 + s + p.len - 1, p.name, { bold: true, color: '#ffffff', fill: PERIOD_COLORS[p.name] || '#475569' }); s += p.len; }); } ws.getRow(r).height = 20; r++;
-  label(r, 'Fase latihan'); { const st = segStarts(plan.phases); plan.phases.forEach((p, i) => put(r, C0 + st[i], C0 + st[i] + p.len - 1, p.label.toUpperCase(), { bold: true, color: '#ffffff', fill: phaseColor(p) })); } ws.getRow(r).height = 30; r++;
-  label(r, 'Mesosiklus'); { const st = segStarts(plan.meso); plan.meso.forEach((m, i) => put(r, C0 + st[i], C0 + st[i] + m.len - 1, m.label, { fill: MESO[i % 2] })); } r++;
-  label(r, 'Tes'); for (let w = 0; w < W; w++) { const on = plan.tests.includes(w); put(r, C0 + w, C0 + w, on ? 'T' : '', on ? { bold: true, fill: '#ffd8a8' } : {}); } r++;
-  label(r, 'Training camp'); for (let w = 0; w < W; w++) { const on = plan.camps.includes(w); put(r, C0 + w, C0 + w, on ? 'TC' : '', on ? { bold: true, fill: '#d0bfff' } : {}); } r++;
+  R.phase = r; label(r, 'Fase latihan'); { const st = segStarts(plan.phases); plan.phases.forEach((p, i) => put(r, C0 + st[i], C0 + st[i] + p.len - 1, p.label.toUpperCase(), { bold: true, color: '#ffffff', fill: phaseColor(p) })); } ws.getRow(r).height = 30; r++;
+  R.meso = r; label(r, 'Mesosiklus'); { const st = segStarts(plan.meso); plan.meso.forEach((m, i) => put(r, C0 + st[i], C0 + st[i] + m.len - 1, m.label, { fill: MESO[i % 2] })); } r++;
+  R.test = r; label(r, 'Tes'); for (let w = 0; w < W; w++) { const on = plan.tests.includes(w); put(r, C0 + w, C0 + w, on ? 'T' : '', on ? { bold: true, fill: '#ffd8a8' } : {}); } r++;
+  R.camp = r; label(r, 'Training camp'); for (let w = 0; w < W; w++) { const on = plan.camps.includes(w); put(r, C0 + w, C0 + w, on ? 'TC' : '', on ? { bold: true, fill: '#d0bfff' } : {}); } r++;
   r++;
 
   // ---- Biomotor ----
@@ -85,7 +95,7 @@ export async function exportXlsx(plan, { watermark }) {
   r++;
 
   // ---- Pertandingan ----
-  label(r, 'Pertandingan'); ws.getRow(r).height = 90;
+  R.ev = r; label(r, 'Pertandingan'); ws.getRow(r).height = 90;
   for (let w = 0; w < W; w++) {
     const ev = plan.events.filter(e => e.week === w);
     const txt = ev.map(e => (e.main ? '★ ' : '') + e.name + (e.place ? ` (${e.place})` : '')).join(' / ');
@@ -99,7 +109,7 @@ export async function exportXlsx(plan, { watermark }) {
   const nr = (name, sub, arr, o = {}) => { label(r, name, sub); for (let w = 0; w < W; w++) put(r, C0 + w, C0 + w, arr(w), o); r++; return r - 1; };
   const volRow = nr('Volume (%)', '', w => plan.vol[w], { fill: '#dbeafe' });
   const intRow = nr('Intensitas (%)', '', w => plan.int[w], { fill: '#ffe3e3' });
-  nr('Indeks puncak (1–5)', '', w => peakIdx(plan, w));
+  R.peak = nr('Indeks puncak (1–5)', '', w => peakIdx(plan, w));
   r++;
   put(r, 1, 2, 'BEBAN LATIHAN (Practice Work Load)', { h: 'left', bold: true, color: '#ffffff', fill: '#334155' }); r++;
   put(r, 1, 1, 'Intensitas (1–5)', { h: 'left', bold: true, fill: '#f1f5f9' }); r++;
@@ -112,7 +122,7 @@ export async function exportXlsx(plan, { watermark }) {
   plan.cats.forEach((c, k) => nr('', c, w => plan.freq[w][k]));
   const fTot = r; label(r, '', 'Total');
   for (let w = 0; w < W; w++) { const L = colL(C0 + w); put(r, C0 + w, C0 + w, { formula: `SUM(${L}${fStart}:${L}${fTot - 1})`, result: plan.freq[w].reduce((a, b) => a + b, 0) }, { bold: true, fill: '#00b0f0' }); } r++;
-  label(r, 'Beban latihan', 'Int × Frek');
+  R.load = r; label(r, 'Beban latihan', 'Int × Frek');
   for (let w = 0; w < W; w++) { const L = colL(C0 + w); put(r, C0 + w, C0 + w, { formula: `${L}${iTot}*${L}${fTot}`, result: plan.ci[w].reduce((a, b) => a + b, 0) * plan.freq[w].reduce((a, b) => a + b, 0) }, { bold: true, fill: '#ffff00' }); }
   r += 2;
 
@@ -135,31 +145,9 @@ export async function exportXlsx(plan, { watermark }) {
   ws.views = [{ state: 'frozen', xSplit: 2, ySplit: freezeRow, showGridLines: false }];
   ws.pageSetup.printTitlesRow = `${top}:${freezeRow}`;
 
-  // ---- Sheet 2: tabel per minggu ----
-  const t = wb.addWorksheet('Tabel Mingguan');
-  t.columns = [
-    { header: 'Minggu', key: 'w', width: 8 }, { header: 'Tanggal (Senin)', key: 'd', width: 16 }, { header: 'Fase', key: 'f', width: 18 },
-    { header: 'Mesosiklus', key: 'm', width: 12 }, { header: 'Volume (%)', key: 'v', width: 11 }, { header: 'Intensitas (%)', key: 'i', width: 13 },
-    { header: 'Indeks puncak', key: 'p', width: 13 }, ...plan.cats.map((c, k) => ({ header: `Frek. ${c}`, key: 'f' + k, width: 12 })),
-    { header: 'Beban', key: 'b', width: 9 }, { header: 'Tes / TC', key: 't', width: 10 }, { header: 'Pertandingan', key: 'e', width: 34 },
-  ];
-  const hr = t.getRow(1); hr.font = { bold: true, color: { argb: 'FFFFFFFF' } }; hr.eachCell(c => { fill(c, '#0f766e'); c.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true }; }); hr.height = 30;
-  const pst = segStarts(plan.phases), mst = segStarts(plan.meso);
-  for (let w = 0; w < W; w++) {
-    const pi = pst.findLastIndex(s => s <= w), mi = mst.findLastIndex(s => s <= w);
-    const row = t.addRow({
-      w: w + 1, d: weekDate(plan, w), f: plan.phases[pi].label, m: plan.meso[mi].label, v: plan.vol[w], i: plan.int[w], p: peakIdx(plan, w),
-      ...Object.fromEntries(plan.cats.map((c, k) => ['f' + k, plan.freq[w][k]])),
-      b: plan.ci[w].reduce((a, b) => a + b, 0) * plan.freq[w].reduce((a, b) => a + b, 0),
-      t: [plan.tests.includes(w) ? 'Tes' : '', plan.camps.includes(w) ? 'TC' : ''].filter(Boolean).join(', '),
-      e: plan.events.filter(e => e.week === w).map(e => (e.main ? '★ ' : '') + e.name).join(' / '),
-    });
-    row.getCell('d').numFmt = 'd mmm yyyy';
-    const pc = phaseColor(plan.phases[pi]); row.getCell('f').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(pc) } }; row.getCell('f').font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    row.eachCell(c => { c.border = border; if (!c.alignment) c.alignment = { horizontal: 'center' }; });
-  }
-  t.views = [{ state: 'frozen', ySplit: 1 }];
-  if (watermark) t.addRow([]).getCell(1).value = 'Dibuat dengan Coach Planner — versi Gratis';
+  Object.assign(R, { vol: volRow, int: intRow, iTot, fTot });
+  linkedSheets(wb, plan, R, C0, { fill, border, argb, watermark });
+  wb.calcProperties = { fullCalcOnLoad: true };
 
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
