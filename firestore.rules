@@ -1,0 +1,33 @@
+rules_version = '2';
+// Aturan keamanan Coach Planner (tempel di Firebase Console → Firestore → Rules)
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    // Profil pengguna: pemilik boleh membuat (sebagai 'free') dan membaca; paket hanya diubah admin.
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if signedIn() && request.auth.uid == uid
+        && request.resource.data.tier == 'free'
+        && !('proUntil' in request.resource.data);
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == uid
+            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['tier', 'proUntil', 'proBy', 'proAt']));
+      allow list: if isAdmin();
+
+      // Rencana milik pengguna
+      match /plans/{planId} {
+        allow read, delete: if signedIn() && request.auth.uid == uid;
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.weeks is int && request.resource.data.weeks <= 104;
+      }
+    }
+
+    // Daftar admin (diisi manual lewat Console: dokumen admins/{uid})
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+  }
+}

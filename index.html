@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Coach Planner — Pembuat Periodisasi Latihan Tahunan</title>
+<meta name="description" content="Buat periodisasi latihan tahunan (annual training plan) dalam hitungan menit: fase, mesosiklus, kalender lomba, volume–intensitas, lalu ekspor ke Excel atau PDF. Untuk pelatih semua cabang olahraga.">
+<meta name="theme-color" content="#0f766e">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Coach Planner — Periodisasi latihan tahunan dalam 5 menit">
+<meta property="og:description" content="Fase, mesosiklus, kalender lomba, grafik volume–intensitas, ekspor Excel berwarna. Gratis untuk mulai.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f766e'/%3E%3Cpath d='M14 44l10-12 8 7 18-21' fill='none' stroke='%23fff' stroke-width='6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/app.css">
+</head>
+<body>
+<a class="skip" href="#app">Lewati ke isi</a>
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="logo" href="#/" aria-label="Coach Planner, beranda"><span class="mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20"><path d="M3 17l5-6 4 3.5L21 5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>Coach Planner</a>
+    <nav aria-label="Menu utama"><ul class="menu" id="menu"></ul></nav>
+    <button class="burger" id="burger" aria-label="Buka menu" aria-expanded="false"><i></i><i></i><i></i></button>
+  </div>
+</header>
+<div id="banner"></div>
+<main id="app" tabindex="-1"><div class="loading">Memuat…</div></main>
+<div id="drawer" class="drawer" hidden></div>
+<div id="modal" class="modal" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script type="module" src="assets/app.js"></script>
+</body>
+</html>
