@@ -22,8 +22,11 @@ export const store = {
     if (!hasFirebase) { user = LS.get('cp.guest', null); emit(); return; }
     const [{ initializeApp }, A, F] = await Promise.all([
       import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js')]);
-    const app = initializeApp(CONFIG.firebase);
+    // Di Vercel/domain sendiri, login lewat proxy /__/auth di domain yang sama (lihat vercel.json)
+    const sameOrigin = (CONFIG.authProxyHosts || []).some(h => location.hostname === h || location.hostname.endsWith('.' + h));
+    const app = initializeApp({ ...CONFIG.firebase, ...(sameOrigin ? { authDomain: location.host } : {}) });
     fb = { auth: A.getAuth(app), db: F.getFirestore(app), A, F };
+    A.getRedirectResult(fb.auth).catch(e => { console.warn('login redirect', e); window.dispatchEvent(new CustomEvent('cp-auth-error', { detail: e })); });
     await new Promise(res => {
       A.onAuthStateChanged(fb.auth, async u => {
         if (!u) { user = null; emit(); res(); return; }

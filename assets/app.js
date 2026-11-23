@@ -627,5 +627,6 @@ async function admin() {
 
 // ---------- mulai ----------
 store.onUser(() => renderNav());
+window.addEventListener('cp-auth-error', e => toast('Gagal masuk: ' + (e.detail?.code || e.detail?.message || 'coba lagi')));
 window.addEventListener('hashchange', route);
 store.init().then(route).catch(e => { console.error(e); app.innerHTML = `<div class="page"><div class="wrap card"><h2>Gagal memuat aplikasi</h2><p class="muted">${esc(e.message)}</p></div></div>`; });

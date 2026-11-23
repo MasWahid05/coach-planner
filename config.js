@@ -9,7 +9,9 @@ export const CONFIG = {
     messagingSenderId: '639970788778',
     appId: '1:639970788778:web:9ee8f819bd3ed1ac6d97d3',
   },
-  freePlans: 1,                 // jumlah rencana untuk akun Gratis
+  // Host yang memakai proxy login /__/auth (vercel.json). Di host lain dipakai authDomain di atas.
+  authProxyHosts: ['vercel.app'],
+  freePlans: 1,                // jumlah rencana untuk akun Gratis
   price: { month: 49000, year: 399000 },
   // GANTI: nomor WhatsApp admin untuk aktivasi Pro (format 62…)
   waAdmin: '6281234567890',
